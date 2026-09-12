@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satellite Model Preview</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #000; }
+    canvas { display: block; }
+    #hint {
+      position: fixed; top: 10px; left: 10px;
+      color: #9fd8ff; font-family: monospace; font-size: 13px;
+      background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 4px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="hint">Drag to orbit, scroll to zoom &mdash; keys 0-9 jump focus: 0 Sun, 1-8 Mercury..Neptune, 9 Satellite &mdash; on Satellite (9): arrow keys orbit camera, left-click swaps its texture</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
