@@ -119,11 +119,6 @@ scene.add(asteroidBelt);
 camera.far = auUnit * 32;
 camera.updateProjectionMatrix();
 
-// primary camera is framed on the Sun — the system's true center; pan/zoom
-// with the mouse to look around, or press a number key to jump focus
-controls.target.set(0, 0, 0);
-camera.position.set(sunRadius * 2.2, sunRadius * 1.1, sunRadius * 3);
-
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -148,12 +143,13 @@ let focusedName = 'Sun';
 const prevFocusPos = new THREE.Vector3(0, 0, 0);
 const focusViewDir = new THREE.Vector3(0.6, 0.35, 0.8).normalize();
 
-function setFocus(name) {
+function setFocus(name, distOverride) {
   focusedName = name;
   const info = getFocusInfo(name);
   // Earth gets a wider frame so its orbiting satellite stays in view too;
-  // every other body is framed relative to its own size.
-  const dist = name === 'Earth' ? satOrbitDistance * 1.5 : info.radius * 3.2;
+  // every other body is framed relative to its own size, unless the
+  // caller asks for a specific distance (used for the startup shot below).
+  const dist = distOverride ?? (name === 'Earth' ? satOrbitDistance * 1.5 : info.radius * 3.2);
   camera.position.copy(info.pos).addScaledVector(focusViewDir, dist);
   controls.target.copy(info.pos);
   prevFocusPos.copy(info.pos);
@@ -163,6 +159,20 @@ window.addEventListener('keydown', (e) => {
   if (e.key >= '0' && e.key <= '9') {
     const name = FOCUS_ORDER[Number(e.key)];
     if (name) setFocus(name);
+  }
+});
+
+// Start focused on the satellite, but pulled back far enough that Earth is
+// also in frame — the assignment's actual subject, front and center.
+setFocus('Satellite', satOrbitDistance * 3.2);
+
+// --- Keyboard: H toggles the instructions panel -------------------------
+const instructionsPanel = document.getElementById('instructions');
+const hintLabel = document.getElementById('hint');
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'h') {
+    instructionsPanel.hidden = !instructionsPanel.hidden;
+    hintLabel.hidden = !instructionsPanel.hidden;
   }
 });
 
