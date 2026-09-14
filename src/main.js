@@ -5,7 +5,6 @@ import { createEarth } from './earth.js';
 import { createSun } from './sun.js';
 import { createOrbitLine } from './orbitLine.js';
 import { PLANET_DATA, createPlanet } from './planets.js';
-import { createAsteroidBelt } from './asteroidBelt.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05070d);
@@ -111,10 +110,6 @@ earthGroup.add(satOrbitLine);
 const planets = PLANET_DATA.map((data) => createPlanet(data, earthRadius, auUnit));
 planets.forEach((p) => scene.add(p.pivot, p.orbitLine));
 
-// --- Asteroid belt, between Mars (1.52 AU) and Jupiter (5.2 AU) --------
-const asteroidBelt = createAsteroidBelt(auUnit * 2.2, auUnit * 3.2, earthRadius, 1200);
-scene.add(asteroidBelt);
-
 // far plane pushed past Neptune's orbit so nothing pops when zooming out
 camera.far = auUnit * 32;
 camera.updateProjectionMatrix();
@@ -176,6 +171,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// --- Keyboard: P pauses every orbit/spin/shadow animation instantly -----
+// Camera navigation (drag, zoom, focus jumps, arrow-key satellite orbit)
+// stays live even while paused — only the scene's own motion freezes.
+let paused = false;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'p') paused = !paused;
+});
+
 // --- Keyboard: arrow keys orbit the camera around the satellite --------
 // Only active while focused on the satellite (key 9) — held keys are
 // tracked in a set so the rotation is smooth for as long as they're down.
@@ -235,18 +238,26 @@ let shadowFactor = 1;
 function animate() {
   requestAnimationFrame(animate);
 
-  earthOrbitPivot.rotation.y += ORBIT_SPEED_EARTH;
-  satOrbitPivot.rotation.y += 0.0025; // satellite orbiting Earth — kept fast
-  satellite.rotation.y += 0.003; // satellite's own local spin — kept fast
-  earth.userData.surface.rotation.y += 0.0006 * SLOW;
-  earth.userData.clouds.rotation.y += 0.0009 * SLOW;
+  if (!paused) {
+    earthOrbitPivot.rotation.y += ORBIT_SPEED_EARTH;
+    satOrbitPivot.rotation.y += 0.0025; // satellite orbiting Earth — kept fast
+    satellite.rotation.y += 0.003; // satellite's own local spin — kept fast
+    // axial spin (day/night turning) is kept at full speed, unlike the
+    // orbits below — it's the "rotate on its own axis" motion and should
+    // read clearly rather than disappear into the near-static system
+    earth.userData.surface.rotation.y += 0.0006;
+    earth.userData.clouds.rotation.y += 0.0009;
 
-  planets.forEach((p) => {
-    p.pivot.rotation.y += p.orbitSpeed * SLOW;
-    p.mesh.rotation.y += p.spinSpeed * SLOW;
-  });
+    planets.forEach((p) => {
+      p.pivot.rotation.y += p.orbitSpeed * SLOW; // revolution around the Sun — slowed
+      p.mesh.rotation.y += p.spinSpeed; // axial spin — full speed
+    });
 
-  asteroidBelt.rotation.y += 0.00015 * SLOW;
+  }
+
+  // keep Earth's hand-written shader lighting pointed at the Sun's actual
+  // position (it's static here, but this stays correct if that ever changes)
+  earth.userData.surfaceMaterial.uniforms.lightPos.value.copy(sun.position);
 
   // only draw the satellite's path once zoomed out far enough for it to
   // read as a path rather than clutter right on top of the satellite
@@ -266,11 +277,13 @@ function animate() {
   const perpDist = _earthToSat.clone().addScaledVector(_sunToEarth, -along).length();
   const eclipsed = along > 0 && perpDist < earthRadius;
 
-  // ease toward the target brightness instead of snapping, so entering/
-  // leaving the shadow reads as a fade rather than a flicker
-  const targetShadow = eclipsed ? 0.12 : 1;
-  shadowFactor += (targetShadow - shadowFactor) * 0.08;
-  setSatelliteShadowFactor(shadowFactor);
+  if (!paused) {
+    // ease toward the target brightness instead of snapping, so entering/
+    // leaving the shadow reads as a fade rather than a flicker
+    const targetShadow = eclipsed ? 0.12 : 1;
+    shadowFactor += (targetShadow - shadowFactor) * 0.08;
+    setSatelliteShadowFactor(shadowFactor);
+  }
 
   // Sun shrinks normally with distance, same as everything else — it's
   // only floored to a minimum on-screen pixel size so it never vanishes.

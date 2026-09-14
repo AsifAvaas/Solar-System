@@ -1,14 +1,21 @@
 # A Satellite in Orbit
 
 CG Lab project — Three.js. A satellite built from primitive geometries orbits
-a textured Earth, set inside a small solar system (Sun + all 8 planets +
-asteroid belt) that gives the scene scale and a real light source.
+a textured Earth, set inside a small solar system (Sun + all 8 planets)
+that gives the scene scale and a real light source.
 
 ## Requirements covered
 
-- **Custom shaders / lighting** — all surfaces are `MeshStandardMaterial`
-  lit by a single `THREE.PointLight` at the Sun's position (the sole light
-  source in the scene, plus a faint ambient fill).
+- **Custom shaders** — Earth's surface is a hand-written `ShaderMaterial`
+  (see [src/earth.js](src/earth.js)): the vertex shader passes world
+  normal/position, the fragment shader computes Lambert diffuse lighting
+  against the Sun's position itself, with a soft terminator and an
+  ambient floor standing in for the scene's ambient light. Everything
+  else uses `MeshStandardMaterial`/`MeshBasicMaterial`.
+- **Lighting** — a single `THREE.PointLight` at the Sun's position (the
+  sole light source in the scene) plus a faint ambient fill; Earth's
+  shader (above) does its own lighting math against the same Sun
+  position rather than relying on the built-in light.
 - **Perspective projection** — `THREE.PerspectiveCamera`.
 - **Texture for each object** — every material uses a procedurally
   generated `THREE.CanvasTexture` (no external image assets): satellite
@@ -17,9 +24,9 @@ asteroid belt) that gives the scene scale and a real light source.
   [src/textures.js](src/textures.js), [src/earth.js](src/earth.js),
   [src/planets.js](src/planets.js).
 - **Animation** — the satellite orbits Earth (fast, always visible);
-  Earth and the other 7 planets orbit the Sun and self-rotate (slowed to
-  near-static so the satellite's motion reads clearly); the asteroid belt
-  slowly drifts.
+  Earth and the other 7 planets self-rotate on their own axis at full
+  speed, while their orbit around the Sun is slowed to near-static so the
+  satellite's motion stays the one thing that reads as clearly moving.
 - **Mouse interaction** — while focused on the satellite (see below),
   left-click cycles its hull texture through 5 liveries.
 - **Keyboard interaction** — number keys `0`-`9` jump the camera to a
@@ -43,6 +50,10 @@ Open the printed `localhost` URL.
 - While focused on the satellite (`9`):
   - Arrow keys — orbit the camera around the satellite.
   - Left-click — cycle the satellite's hull texture.
+- `H` — toggle the on-screen instructions panel.
+- `P` — pause/resume all orbiting, spinning, and shadow-fade animation
+  instantly. Camera navigation (drag, zoom, focus jumps, arrow-key
+  satellite orbit) stays live while paused.
 
 ## Notable implementation details
 
@@ -78,7 +89,6 @@ src/
   earth.js             Earth: day map, clouds, atmosphere
   sun.js                Sun: core + glow sprite
   planets.js            the other 7 planets + orbit rings
-  asteroidBelt.js        instanced asteroid belt between Mars and Jupiter
   orbitLine.js            shared white orbit-ring helper
   textures.js              procedural canvas textures for the satellite
 ```

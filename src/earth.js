@@ -115,21 +115,67 @@ function cloudMapTexture(w = 1024, h = 512) {
   return new THREE.CanvasTexture(canvas);
 }
 
+// Custom shader for Earth's surface — lighting is computed by hand here
+// instead of relying on MeshStandardMaterial's built-in model, using the
+// Sun's actual world position as a uniform (updated from main.js each
+// frame, even though the Sun happens to be static). ambientStrength
+// stands in for the scene's AmbientLight, since a ShaderMaterial doesn't
+// pick that up automatically.
+const surfaceVertexShader = `
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPosition;
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPos.xyz;
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const surfaceFragmentShader = `
+  uniform sampler2D dayMap;
+  uniform vec3 lightPos;
+  uniform vec3 lightColor;
+  uniform float ambientStrength;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPosition;
+  varying vec2 vUv;
+
+  void main() {
+    vec3 N = normalize(vWorldNormal);
+    vec3 L = normalize(lightPos - vWorldPosition);
+    float ndotl = dot(N, L);
+    // soft terminator instead of a hard day/night clamp
+    float lit = smoothstep(-0.2, 0.15, ndotl);
+    vec3 tex = texture2D(dayMap, vUv).rgb;
+    vec3 color = tex * lightColor * mix(ambientStrength, 1.0, lit);
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
 /**
- * Builds Earth as a Group: a lit day-side sphere, a slightly larger
- * semi-transparent cloud shell, and a faint additive atmosphere rim.
- * `radius` should be picked relative to the satellite model's own scale —
- * see main.js for how the two are sized against each other.
+ * Builds Earth as a Group: a custom-shaded, hand-lit day-side sphere, a
+ * slightly larger semi-transparent cloud shell, and a faint additive
+ * atmosphere rim. `radius` should be picked relative to the satellite
+ * model's own scale — see main.js for how the two are sized against each
+ * other.
  */
 export function createEarth(radius = 40) {
   const earth = new THREE.Group();
   earth.name = 'earth';
 
   const surfaceGeo = new THREE.SphereGeometry(radius, 64, 64);
-  const surfaceMat = new THREE.MeshStandardMaterial({
-    map: dayMapTexture(),
-    roughness: 0.85,
-    metalness: 0.0,
+  const surfaceMat = new THREE.ShaderMaterial({
+    vertexShader: surfaceVertexShader,
+    fragmentShader: surfaceFragmentShader,
+    uniforms: {
+      dayMap: { value: dayMapTexture() },
+      lightPos: { value: new THREE.Vector3(0, 0, 0) },
+      lightColor: { value: new THREE.Color(0xfff4e0) },
+      ambientStrength: { value: 0.25 },
+    },
   });
   const surface = new THREE.Mesh(surfaceGeo, surfaceMat);
   surface.name = 'earthSurface';
@@ -157,6 +203,7 @@ export function createEarth(radius = 40) {
   earth.add(atmosphere);
 
   earth.userData.surface = surface;
+  earth.userData.surfaceMaterial = surfaceMat;
   earth.userData.clouds = clouds;
   earth.userData.radius = radius;
 
