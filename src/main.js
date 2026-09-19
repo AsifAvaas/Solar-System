@@ -5,6 +5,7 @@ import { createEarth } from './earth.js';
 import { createSun } from './sun.js';
 import { createOrbitLine } from './orbitLine.js';
 import { PLANET_DATA, createPlanet } from './planets.js';
+import { createRocketMission } from './Rocketmission.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05070d);
@@ -110,6 +111,11 @@ earthGroup.add(satOrbitLine);
 const planets = PLANET_DATA.map((data) => createPlanet(data, earthRadius, auUnit));
 planets.forEach((p) => scene.add(p.pivot, p.orbitLine));
 
+const rocketMission = createRocketMission({
+  scene, earth, earthGroup, earthRadius, planets,
+  rocketSize: satMaxSpan * 0.4, // keeps rocket detail on par with the satellite
+});
+
 // far plane pushed past Neptune's orbit so nothing pops when zooming out
 camera.far = auUnit * 32;
 camera.updateProjectionMatrix();
@@ -130,6 +136,7 @@ function getFocusInfo(name) {
   if (name === 'Sun') return { pos: new THREE.Vector3(0, 0, 0), radius: sunRadius };
   if (name === 'Earth') return { pos: earthGroup.getWorldPosition(new THREE.Vector3()), radius: earthRadius };
   if (name === 'Satellite') return { pos: satellite.getWorldPosition(new THREE.Vector3()), radius: satMaxSpan };
+  if (name === 'Rocket') return { pos: rocketMission.object.getWorldPosition(new THREE.Vector3()), radius: satMaxSpan * 3 };
   const p = planetByName[name];
   return { pos: p.mesh.getWorldPosition(new THREE.Vector3()), radius: p.radius };
 }
@@ -169,6 +176,14 @@ window.addEventListener('keydown', (e) => {
     instructionsPanel.hidden = !instructionsPanel.hidden;
     hintLabel.hidden = !instructionsPanel.hidden;
   }
+});
+
+// --- Keyboard: R focuses the camera on the rocket, wherever it is -------
+// Works while parked or mid-flight — getFocusInfo('Rocket') always reads
+// the rocket's current live world position, so the per-frame camera-chase
+// logic further down keeps tracking it through liftoff/transit/landing.
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() === 'r') setFocus('Rocket');
 });
 
 // --- Keyboard: P pauses every orbit/spin/shadow animation instantly -----
@@ -252,6 +267,7 @@ function animate() {
       p.pivot.rotation.y += p.orbitSpeed * SLOW; // revolution around the Sun — slowed
       p.mesh.rotation.y += p.spinSpeed; // axial spin — full speed
     });
+    rocketMission.update(performance.now());
 
   }
 
